@@ -3,6 +3,8 @@ import tensorflow as tf
 import pyximport
 pyximport.install()
 from sklearn.decomposition import _cdnmf_fast
+from sklearn.decomposition._nmf import _update_coordinate_descent
+from sklearn.utils import check_array
 import numpy as np
 
 global NUM_ITERATIONS
@@ -46,6 +48,42 @@ def _tf_fit_coordinate_descent(X: tf.Variable, W: tf.Variable, H: tf.Variable):
         updated_Ht = _tf_update_coordinate_descent(X=tf.transpose(X), W=Ht, Ht=W)
         H.assign(tf.transpose(updated_Ht))
 
+def _fit_compare_coordinate_descents(X: np.ndarray, W: tf.Variable, H: tf.Variable, num_iterations: int):
+    n_components = W.shape[1]
+    n_samples = W.shape[0]
+    tf_W = tf.Variable(initial_value=W)
+    sk_W = W.numpy().copy()
+    sk_W = check_array(sk_W, order='C')
+    tf_H = tf.Variable(initial_value=H)
+    sk_H = H.numpy().copy()
+    tf_Ht = tf.Variable(initial_value=tf.transpose(tf_H))
+    sk_Ht = tf.transpose(sk_H)
+
+    for i in range(num_iterations):
+        print(f"Iteration [{i+1}/{num_iterations}]:")
+        violation = 0.0
+        tf_Ht.assign(tf.transpose(tf_H))
+        sk_Ht = sk_H.T
+        sk_Ht = check_array(sk_Ht, order='C')
+
+        # Update SkLearn W:
+        violation += _update_coordinate_descent(X=X, W=sk_W, Ht=sk_Ht, l1_reg=0.0, l2_reg=0.0, shuffle=False, random_state=None)
+        # Update TensorFlow W:
+        updated_W = _tf_update_coordinate_descent(X=X, W=tf_W, Ht=tf_Ht)
+        tf_W.assign(updated_W)
+
+        # Run W assertions:
+        np.testing.assert_allclose(actual=tf_W, desired=sk_W, rtol=1e-7)
+
+        # Update SkLearn H:
+        violation += _update_coordinate_descent(X=X.T, W=sk_Ht, Ht=sk_W, l1_reg=0.0, l2_reg=0.0, shuffle=False, random_state=None)
+        sk_H = sk_Ht.T
+        # Update TensorFlow H:
+        updated_Ht = _tf_update_coordinate_descent(X=X.T, W=tf_Ht, Ht=tf_W)
+        tf_H.assign(tf.transpose(updated_Ht))
+
+        # Run H assertions:
+        np.testing.assert_allclose(actual=tf_H, desired=sk_H, rtol=1e-7)
 
 def _compare_coordinate_descents(X: tf.Variable, W: tf.Variable, H: tf.Variable, num_iterations: int):
     n_components = W.shape[1]
@@ -93,6 +131,7 @@ def _compare_coordinate_descents(X: tf.Variable, W: tf.Variable, H: tf.Variable,
 def main():
 
     _X = np.load("X.npy")
+    _X_norm = np.load("X_norm.npy")
     _W_init = np.load("W_init.npy")
     _H_init = np.load("H_init.npy")
 
@@ -101,7 +140,8 @@ def main():
     H_init = tf.Variable(initial_value=_H_init)
 
     # _tf_fit_coordinate_descent(X=X, W=W_init, H=H_init)
-    _compare_coordinate_descents(X=X, W=W_init, H=H_init, num_iterations=4)
+    # _compare_coordinate_descents(X=X, W=W_init, H=H_init, num_iterations=4)
+    _fit_compare_coordinate_descents(X=_X_norm, W=W_init, H=H_init, num_iterations=4)
 
 if __name__ == '__main__':
     main()
