@@ -135,7 +135,7 @@ def main():
     _W_init = np.load("W_init.npy")
     _H_init = np.load("H_init.npy")
 
-    X = tf.Variable(initial_value=_X)
+    X = tf.Variable(initial_value=_X_norm)
     W_init = tf.Variable(initial_value=_W_init)
     H_init = tf.Variable(initial_value=_H_init)
 
