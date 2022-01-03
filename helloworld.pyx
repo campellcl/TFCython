@@ -1,3 +1,4 @@
+import os
 from tempfile import TemporaryFile
 import tensorflow as tf
 import pyximport
@@ -138,6 +139,11 @@ def main():
     X = tf.Variable(initial_value=_X_norm)
     W_init = tf.Variable(initial_value=_W_init)
     H_init = tf.Variable(initial_value=_H_init)
+
+    # Is TF running on GPU or CPU:
+    print(f"Num GPUs: {len(tf.config.list_physical_devices('GPU'))}" )
+    # Disable GPUs:
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
     # _tf_fit_coordinate_descent(X=X, W=W_init, H=H_init)
     # _compare_coordinate_descents(X=X, W=W_init, H=H_init, num_iterations=4)
